@@ -1,9 +1,12 @@
 ﻿/**
- * Time Waster plugin for showtime version 0.1  by NP
+ * Time Waster plugin for showtime version 0.11  by NP
  *
  *  Copyright (C) 2011 NP
  * 
  *  ChangeLog: 
+ *  0.11
+ *  Fix CheezNetwork (scraper)
+ *  Added Funny or Die Video Quality option
  * 
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,6 +24,10 @@
 
 //TODO : Clean up
 /*
+ * http://smilepanic.com/
+ * http://www.smartphowned.com/
+ * http://www.damnlol.com/
+ * http://lolsnaps.com/
  * http://www.liveleak.com/
  * http://www.disclose.tv/
  * 
@@ -163,6 +170,10 @@ var CHAR_LIST = [ [/&#x27;/gi, "'"], [/&#038;/gi, "&"], [/&#x26;/gi, "&"], [/&am
 	    service.youtube = v;
 	  });
 
+	settings.createBool("funnyhd", "Funny or Die HD", false, function(v) {
+	    service.funnyhd = v;
+	  });
+
 	settings.createBool("gif", "Support gif images (PS3 version doesn't support)", false, function(v) {
 	    service.gif = v;
 	  });
@@ -283,12 +294,15 @@ plugin.addURI( PREFIX + "funnyordie:(.*)", function(page, link){
 plugin.addURI( PREFIX + "funnyordie:play:(.*)", function(page, link){
 	
 	var content = showtime.httpGet('http://www.funnyordie.com'+link).toString();
-	//showtime.trace('iPhone: ' + getValue(content, "'","iphone_wifi.mp4", 'endRef'));
-	//showtime.trace('iPad: ' + getValue(content, "'","ipad.mp4", 'endRef'));
+	var url = '';
+	if(service.funnyhd == '1')
+		url = getValue(content, "'","ipad.mp4", 'endRef') + 'ipad.mp4';
+	if (url == '' || url == 'ipad.mp4')
+		url = getValue(content, "'","iphone_wifi.mp4", 'endRef')+"iphone_wifi.mp4";
 	page.source = "videoparams:" + showtime.JSONEncode({      
 		sources: [
 		{	
-			url: getValue(content, "'","iphone_wifi.mp4", 'endRef')+"iphone_wifi.mp4"
+			url: url
 		}]    
 	});    
 	page.type = "video"; 
@@ -409,32 +423,11 @@ plugin.addURI( PREFIX + "cheezburger:(.*)", function(page, site){
 		
 	content = getValue(content,'<h2>',' >Next');
 	content = cleanString(content);
-	content = content.split('<!-- end: Print On Demand -->');
+	content = content.split('<h2>');
 	var title = null;
 	var name = null;
 	for each (var post in content){
-		title = post.match(" src=(.*) alt=(.*)>");
-		if(post.indexOf('youtube.com')!=-1){
-			title = getValue(post, "'title' : '","'").replace(/\+/gi,' ');
-			page.appendItem( 'youtube:video:simple:'+ escape(title) + ':' +getValue(post,'youtube.com/embed/','?'), "video",
-				 { title: unescape(title) + ' (Video)',
-					icon: '' });
-			
-		}else if(title != null){
-			title = title.toString().replace(/\"/gi, "'");
-			//name = getValue(title, "alt='", "'");
-			name = getValue(post, "title=", ">").replace('Permanent Link to','').replace(/\"/g, '').replace(/\'/g, '');
-			name = cleanString(name);
-			if(name.indexOf(' - ') != -1)
-				name = name.slice(name.indexOf('-')+1, name.length)
-			if(name.indexOf(': ') != -1)
-				name = name.slice(name.indexOf(':')+1, name.length)
-			if(fileSupport(getValue(title, "src='","'")) != '')	
-				page.appendItem( getValue(title, "src='","'"), "image",
-					 { title: name ,
-						icon: getValue(title, "src='","'") });
-		
-		}else if(getValue(post, 'src="http://www.viddler.com', '"') != ''){
+		if(getValue(post, 'src="http://www.viddler.com', '"') != ''){
 			/*Not Working
 			page.appendItem( 'http://' + getValue(post, 'http://', '/html5mobile/','endRef') + '/html5mobile/'
 				, "video", { title: getValue(post, '>','</a></h2>', 'endRef')+'(video)',
@@ -442,8 +435,27 @@ plugin.addURI( PREFIX + "cheezburger:(.*)", function(page, site){
 			showtime.trace('viddler: ' +  getValue(post, 'src="http://www.viddler.com', '"','start','all').replace('"',''));
 			showtime.trace('?: '+getValue(post, 'src="http://www.viddler.com', '"', 'start', ''));
 			*/
-		}
+		}else if(post.indexOf('youtube.com')!=-1){
+			title = getValue(post, "title=", ">").replace('Permanent Link to','').replace(/\"/g, '').replace(/\'/g, '');
+			page.appendItem( 'youtube:video:simple:'+ escape(title) + ':' +getValue(post,'youtube.com/embed/','?'), "video",
+				 { title: unescape(title) + ' (Video)',
+					icon: '' });
+			
+		}else if(getValue(post, "src='","'") != ''){
 
+			name = getValue(post, "title=", ">").replace('Permanent Link to','').replace(/\"/g, '').replace(/\'/g, '');
+			name = cleanString(name);
+			if(name.indexOf(' - ') != -1)
+				name = name.slice(name.indexOf('-')+1, name.length)
+			if(name.indexOf(': ') != -1)
+				name = name.slice(name.indexOf(':')+1, name.length)
+			if(fileSupport(getValue(post, "src='","'")) != '')	
+				page.appendItem( getValue(post, "src='","'"), "image",
+					 { title: name ,
+						icon: getValue(post, "src='","'") });
+		
+		}
+		showtime.trace('LInk: ' + getValue(post, "src='","'"));
 	}
 	
 	//Next
